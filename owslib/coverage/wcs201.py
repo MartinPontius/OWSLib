@@ -363,13 +363,29 @@ class ContentMetadata(object):
         for envelope in self.descCov.findall(
             nsWCS2("CoverageDescription/") + "{http://www.opengis.net/gml/3.2}boundedBy/" + "{http://www.opengis.net/gml/3.2}Envelope"  # noqa
         ):
+            # ToDo: check and respect axis order (x,y) or (y,x) properly when parsing coordinates for bbox
             bbox = {}
             bbox["nativeSrs"] = envelope.attrib["srsName"]
+            dims = int(envelope.attrib["srsDimension"])
+            axis_labels = envelope.attrib["axisLabels"].lower().split()
             lc = envelope.find("{http://www.opengis.net/gml/3.2}lowerCorner")
             lc = lc.text.split()
             uc = envelope.find("{http://www.opengis.net/gml/3.2}upperCorner")
             uc = uc.text.split()
-            bbox["bbox"] = (float(lc[0]), float(lc[1]), float(uc[0]), float(uc[1]))
+            if dims == 2:
+                if axis_labels[0] == 'lat' and (axis_labels[1] == 'long' or axis_labels[1] == 'lon'):
+                    bbox["bbox"] = (float(lc[1]), float(lc[0]), float(uc[1]), float(uc[0]))
+                else:
+                    bbox["bbox"] = (float(lc[0]), float(lc[1]), float(uc[0]), float(uc[1]))
+            elif dims == 3:
+                # assumed time is always in first position
+                if axis_labels[1] == 'lat' and (axis_labels[2] == 'long' or axis_labels[2] == 'lon'):
+                    bbox["bbox"] = (float(lc[2]), float(lc[1]), float(uc[2]), float(uc[1]))
+                else:
+                    bbox["bbox"] = (float(lc[1]), float(lc[2]), float(uc[1]), float(uc[2]))
+                bbox["time_range"] = (lc[0].replace('"', ''), uc[0].replace('"', ''))
+            else:
+                bbox["bbox"] = (float(lc[0]), float(lc[1]), float(uc[0]), float(uc[1]))
             bboxes.append(bbox)
 
         return bboxes
